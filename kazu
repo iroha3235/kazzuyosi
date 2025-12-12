@@ -1,0 +1,101 @@
+/**
+ * 引数に渡された要素の設定からhtml文を作成します
+ * @param items 要素の配列。
+ * `{ tag: 'div', id: 'hoge', name: 'fuga', attributes: { tabindex: 1 }, children: [ { tag: 'button', class: 'btn', children: ['ボタン'] } ] }`
+ * @returns itemsから作成されたhtml文字列。
+ * `<div id="hoge" name="fuga"><button class="btn">ボタン</button></div>`
+ */
+function makeHtml(items) {
+  let html = ''
+  for (const item of items) {
+    switch (typeof item) {
+      case 'object':
+        const {
+          tag,
+          class: cls,
+          name,
+          id,
+          attributes,
+          children,
+        } = item
+        let classStr = null
+        if (Array.isArray(cls)) {
+          classStr = cls.join(' ')
+        } else if (typeof cls === 'string') {
+          classStr = cls
+        }
+        const attrs = Object.entries({
+          id,
+          name,
+          class: classStr,
+          ...attributes
+        })
+        .filter(([k, v]) => v != null)
+        .map(([k, v]) => `${k}="${v}"`)
+        const startTag = `<${[tag, ...attrs].join(' ')}>`
+        const endTag = !['img', 'input'].includes(tag) ? `</${tag}>` : ''
+        const innerHtml = children ? makeHtml(children) : ''
+        html += `${startTag}${innerHtml}${endTag}`
+        break;
+      case 'string':
+        html += item
+    }
+  }
+  return html
+}
+
+/**
+ * アイコン付のボタン要素のmakeHtml関数用設定オブジェクトを作成します
+ * @param icon アイコン画像のURL
+ * @param text ボタンに表示する文字列
+ * @param id ボタンに指定するid (任意)
+ * @param cls ボタンに指定するクラス (任意)
+ * @returns makeHtml関数用設定オブジェクト
+ */
+function makeIconButtonElement(icon, text, id = null, cls = null) {
+  return {
+    tag: 'button',
+    id,
+    class: cls,
+    children: [
+      {
+        tag: 'img',
+        attributes: {
+          src: icon,
+        }
+      },
+      {
+        tag: 'span',
+        children: [text]
+      }
+    ]
+  }
+}
+
+function makeSaveAndTrashButtonAreaHtml(currentDateLength) {
+  return makeHtml([
+    makeIconButtonElement(floppyIcon, '保存', 'save-button', storedAutosaveKey ? 'active-menu' : null),
+    makeIconButtonElement(trashIcon, '削除', 'trash-button', storedTrashKey ? 'active-menu' : null),
+    {
+      tag: 'div',
+      id: 'currentIndexCount',
+      attributes: {
+        title: 'count',
+      }
+    },
+    {
+      tag: 'div',
+      id: 'currentDateLength',
+      attributes: {
+        title: 'count',
+      },
+      children: [`残りの数 ${currentDateLength}`]
+    },
+  ])
+}
+
+// document.querySelector('#currentDateLength').innerText = `残りの数 ${currentDateLength}`
+
+
+const myArea = document.querySelector('#myArea')
+myArea.innerHTML = makeSaveAndTrashButtonAreaHtml(10)
