@@ -1,0 +1,11 @@
+void OnTriggerEnter(Collider other)
+{
+    // ぶつかった相手を Itemクラスとして扱ってみる
+    Item item = other.GetComponent<MonoBehaviour>() as Item;
+
+    // もし Item だったら（nullじゃなかったら）
+    if (item != null)
+    {
+        item.Get(); // アイテムをゲット！
+    }
+}
