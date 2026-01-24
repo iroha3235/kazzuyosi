@@ -1,0 +1,69 @@
+// Video: https://www.youtube.com/watch?v=iR3Qxtv1VQw&t=32s
+
+function preload() {
+  // upperarm = loadImage("upperarm.png")
+  // forearm = loadImage("forearm.png")
+  upperarm = loadImage("spongebobupperarm.png")
+  forearm = loadImage("spongebobforearm.png")
+  spongebob = loadImage("spongebob no arms.jpg")
+}
+
+let armature = {
+  x: 300, 
+  y: 200,
+  l: 100
+}
+
+let target = {
+  x: 250,
+  y: 200
+}
+
+let d = 150;
+
+function setup() {
+  createCanvas(600, 400);
+  rectMode(CENTER)
+  imageMode(CENTER)
+  let scl = 1.1
+  forearm.resize(armature.l*scl, forearm.height * armature.l*scl/forearm.width)
+  upperarm.resize(armature.l*scl, upperarm.height * armature.l*scl/upperarm.width)
+}
+
+function draw() {
+  background(220);
+  image(spongebob, width/2 - 110, height/2, spongebob.width/2, spongebob.height/2)
+  
+  target.x = mouseX;
+  target.y = mouseY
+  
+  d = min(armature.l*2, dist(armature.x, armature.y, target.x, target.y) )
+  
+  translate(armature.x, armature.y)
+  let dy = target.y - armature.y;
+  let dx = target.x - armature.x;
+  let th = atan2(dy, dx)
+  rotate(th)
+  
+  let h = sqrt(armature.l**2 - (d/2)**2)
+  
+
+  
+  // Draw arm with images
+  push()
+    translate(d/2/2, h/2)
+    rotate(atan2(h, d/2))
+    image(upperarm, 0, 0)
+  pop()
+  push()
+    translate(d, 0)
+    translate(-d/2/2, h/2)
+    rotate(-atan2(h, d/2))
+    image(forearm, 0, 0)
+    rotate(atan2(h, d/2))
+    translate(d/2/2, -h/2)
+    rotate(-atan2(h, d/2))
+    // ellipse(0, 0, 25, 25)
+  pop()
+  
+}
