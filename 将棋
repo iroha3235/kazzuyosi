@@ -1,0 +1,582 @@
+import React, { useState, useEffect } from 'react';
+
+// 駒の定義
+const PIECES = {
+  FU: { name: '歩', promoted: 'と' },
+  KYO: { name: '香', promoted: '杏' },
+  KEI: { name: '桂', promoted: '圭' },
+  GIN: { name: '銀', promoted: '全' },
+  KIN: { name: '金', promoted: null },
+  KAKU: { name: '角', promoted: '馬' },
+  HI: { name: '飛', promoted: '龍' },
+  OU: { name: '王', promoted: null },
+  GYOKU: { name: '玉', promoted: null }
+};
+
+// 初期盤面の設定
+const createInitialBoard = () => {
+  const board = Array(9).fill(null).map(() => Array(9).fill(null));
+  
+  // 後手の駒
+  board[0][0] = { type: 'KYO', player: 2, promoted: false };
+  board[0][1] = { type: 'KEI', player: 2, promoted: false };
+  board[0][2] = { type: 'GIN', player: 2, promoted: false };
+  board[0][3] = { type: 'KIN', player: 2, promoted: false };
+  board[0][4] = { type: 'OU', player: 2, promoted: false };
+  board[0][5] = { type: 'KIN', player: 2, promoted: false };
+  board[0][6] = { type: 'GIN', player: 2, promoted: false };
+  board[0][7] = { type: 'KEI', player: 2, promoted: false };
+  board[0][8] = { type: 'KYO', player: 2, promoted: false };
+  board[1][1] = { type: 'KAKU', player: 2, promoted: false };
+  board[1][7] = { type: 'HI', player: 2, promoted: false };
+  for (let i = 0; i < 9; i++) {
+    board[2][i] = { type: 'FU', player: 2, promoted: false };
+  }
+  
+  // 先手の駒
+  for (let i = 0; i < 9; i++) {
+    board[6][i] = { type: 'FU', player: 1, promoted: false };
+  }
+  board[7][7] = { type: 'KAKU', player: 1, promoted: false };
+  board[7][1] = { type: 'HI', player: 1, promoted: false };
+  board[8][0] = { type: 'KYO', player: 1, promoted: false };
+  board[8][1] = { type: 'KEI', player: 1, promoted: false };
+  board[8][2] = { type: 'GIN', player: 1, promoted: false };
+  board[8][3] = { type: 'KIN', player: 1, promoted: false };
+  board[8][4] = { type: 'GYOKU', player: 1, promoted: false };
+  board[8][5] = { type: 'KIN', player: 1, promoted: false };
+  board[8][6] = { type: 'GIN', player: 1, promoted: false };
+  board[8][7] = { type: 'KEI', player: 1, promoted: false };
+  board[8][8] = { type: 'KYO', player: 1, promoted: false };
+  
+  return board;
+};
+
+// 駒の移動可能な位置を計算
+const getValidMoves = (board, row, col, piece) => {
+  const moves = [];
+  const direction = piece.player === 1 ? -1 : 1;
+  
+  const addMove = (r, c) => {
+    if (r >= 0 && r < 9 && c >= 0 && c < 9) {
+      if (!board[r][c] || board[r][c].player !== piece.player) {
+        moves.push([r, c]);
+      }
+    }
+  };
+  
+  const addSlidingMoves = (directions) => {
+    for (const [dr, dc] of directions) {
+      let r = row + dr;
+      let c = col + dc;
+      while (r >= 0 && r < 9 && c >= 0 && c < 9) {
+        if (board[r][c]) {
+          if (board[r][c].player !== piece.player) {
+            moves.push([r, c]);
+          }
+          break;
+        }
+        moves.push([r, c]);
+        r += dr;
+        c += dc;
+      }
+    }
+  };
+  
+  if (piece.promoted) {
+    // 成駒の動き
+    const promotedType = piece.type;
+    if (promotedType === 'FU' || promotedType === 'KYO' || promotedType === 'KEI' || promotedType === 'GIN') {
+      // 金と同じ動き
+      [[direction, 0], [direction, -1], [direction, 1], [0, -1], [0, 1], [-direction, 0]].forEach(([dr, dc]) => {
+        addMove(row + dr, col + dc);
+      });
+    } else if (promotedType === 'KAKU') {
+      // 馬（角の成駒）
+      addSlidingMoves([[1, 1], [1, -1], [-1, 1], [-1, -1]]);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => {
+        addMove(row + dr, col + dc);
+      });
+    } else if (promotedType === 'HI') {
+      // 龍（飛車の成駒）
+      addSlidingMoves([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([dr, dc]) => {
+        addMove(row + dr, col + dc);
+      });
+    }
+  } else {
+    // 通常の駒の動き
+    switch (piece.type) {
+      case 'FU': // 歩
+        addMove(row + direction, col);
+        break;
+      case 'KYO': // 香車
+        addSlidingMoves([[direction, 0]]);
+        break;
+      case 'KEI': // 桂馬
+        addMove(row + direction * 2, col - 1);
+        addMove(row + direction * 2, col + 1);
+        break;
+      case 'GIN': // 銀
+        [[direction, 0], [direction, -1], [direction, 1], [-direction, -1], [-direction, 1]].forEach(([dr, dc]) => {
+          addMove(row + dr, col + dc);
+        });
+        break;
+      case 'KIN': // 金
+        [[direction, 0], [direction, -1], [direction, 1], [0, -1], [0, 1], [-direction, 0]].forEach(([dr, dc]) => {
+          addMove(row + dr, col + dc);
+        });
+        break;
+      case 'KAKU': // 角
+        addSlidingMoves([[1, 1], [1, -1], [-1, 1], [-1, -1]]);
+        break;
+      case 'HI': // 飛車
+        addSlidingMoves([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+        break;
+      case 'OU':
+      case 'GYOKU': // 王/玉
+        [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([dr, dc]) => {
+          addMove(row + dr, col + dc);
+        });
+        break;
+    }
+  }
+  
+  return moves;
+};
+
+const ShogiGame = () => {
+  const [board, setBoard] = useState(createInitialBoard());
+  const [selectedSquare, setSelectedSquare] = useState(null);
+  const [validMoves, setValidMoves] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState(1);
+  const [capturedPieces, setCapturedPieces] = useState({ 1: [], 2: [] });
+  const [showPromotionDialog, setShowPromotionDialog] = useState(null);
+  const [gameStatus, setGameStatus] = useState('playing');
+
+  const handleSquareClick = (row, col) => {
+    if (showPromotionDialog) return;
+    
+    const piece = board[row][col];
+    
+    // 有効な移動先がクリックされた場合
+    if (selectedSquare && validMoves.some(([r, c]) => r === row && c === col)) {
+      const [fromRow, fromCol] = selectedSquare;
+      const movingPiece = board[fromRow][fromCol];
+      const newBoard = board.map(r => [...r]);
+      
+      // 駒を取る
+      if (piece) {
+        const captured = { ...piece, promoted: false, player: currentPlayer };
+        setCapturedPieces(prev => ({
+          ...prev,
+          [currentPlayer]: [...prev[currentPlayer], captured]
+        }));
+      }
+      
+      // 駒を移動
+      newBoard[row][col] = movingPiece;
+      newBoard[fromRow][fromCol] = null;
+      
+      // 成れるかチェック
+      const canPromote = !movingPiece.promoted && 
+                        PIECES[movingPiece.type].promoted &&
+                        ((movingPiece.player === 1 && (fromRow <= 2 || row <= 2)) ||
+                         (movingPiece.player === 2 && (fromRow >= 6 || row >= 6)));
+      
+      if (canPromote) {
+        setShowPromotionDialog({ board: newBoard, row, col });
+      } else {
+        setBoard(newBoard);
+        setCurrentPlayer(currentPlayer === 1 ? 2 : 1);
+      }
+      
+      setSelectedSquare(null);
+      setValidMoves([]);
+    } 
+    // 自分の駒が選択された場合
+    else if (piece && piece.player === currentPlayer) {
+      setSelectedSquare([row, col]);
+      setValidMoves(getValidMoves(board, row, col, piece));
+    } 
+    // 選択解除
+    else {
+      setSelectedSquare(null);
+      setValidMoves([]);
+    }
+  };
+
+  const handlePromotion = (promote) => {
+    if (!showPromotionDialog) return;
+    
+    const { board: newBoard, row, col } = showPromotionDialog;
+    if (promote) {
+      newBoard[row][col].promoted = true;
+    }
+    
+    setBoard(newBoard);
+    setShowPromotionDialog(null);
+    setCurrentPlayer(currentPlayer === 1 ? 2 : 1);
+  };
+
+  const resetGame = () => {
+    setBoard(createInitialBoard());
+    setSelectedSquare(null);
+    setValidMoves([]);
+    setCurrentPlayer(1);
+    setCapturedPieces({ 1: [], 2: [] });
+    setShowPromotionDialog(null);
+    setGameStatus('playing');
+  };
+
+  const getPieceName = (piece) => {
+    if (piece.promoted) {
+      return PIECES[piece.type].promoted;
+    }
+    return PIECES[piece.type].name;
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #2c1810 0%, #1a0f0a 100%)',
+      padding: '2rem',
+      fontFamily: '"Noto Serif JP", serif',
+      color: '#f4e4d4'
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;700;900&display=swap');
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        
+        @keyframes slideIn {
+          from { transform: translateX(-20px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .piece-enter {
+          animation: fadeIn 0.3s ease-out;
+        }
+        
+        .valid-move {
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* タイトル */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '2rem',
+          animation: 'fadeIn 0.8s ease-out'
+        }}>
+          <h1 style={{
+            fontSize: '4rem',
+            fontWeight: 900,
+            margin: 0,
+            marginBottom: '0.5rem',
+            background: 'linear-gradient(135deg, #d4a574 0%, #f4e4d4 50%, #d4a574 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            textShadow: '0 2px 20px rgba(212, 165, 116, 0.3)',
+            letterSpacing: '0.2em'
+          }}>将棋</h1>
+          <div style={{
+            fontSize: '1.2rem',
+            color: '#c4a484',
+            letterSpacing: '0.5em',
+            fontWeight: 400
+          }}>SHOGI</div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* 持ち駒エリア（後手） */}
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.4)',
+            border: '2px solid #5a4a3a',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            minWidth: '200px',
+            animation: 'slideIn 0.6s ease-out'
+          }}>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 600,
+              marginBottom: '1rem',
+              color: '#d4a574',
+              borderBottom: '2px solid #5a4a3a',
+              paddingBottom: '0.5rem'
+            }}>
+              後手の持ち駒
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {capturedPieces[2].map((piece, idx) => (
+                <div key={idx} style={{
+                  background: 'rgba(212, 165, 116, 0.15)',
+                  border: '1px solid #7a5a3a',
+                  borderRadius: '6px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '1.2rem',
+                  fontWeight: 600
+                }}>
+                  {getPieceName(piece)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 盤面 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #3d2817 0%, #2d1f12 100%)',
+            padding: '2rem',
+            borderRadius: '20px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            border: '3px solid #5a4a3a',
+            animation: 'fadeIn 0.6s ease-out 0.2s both'
+          }}>
+            <div style={{
+              display: 'inline-block',
+              background: '#d4a574',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}>
+              {board.map((row, rowIndex) => (
+                <div key={rowIndex} style={{ display: 'flex' }}>
+                  {row.map((piece, colIndex) => {
+                    const isSelected = selectedSquare && selectedSquare[0] === rowIndex && selectedSquare[1] === colIndex;
+                    const isValidMove = validMoves.some(([r, c]) => r === rowIndex && c === colIndex);
+                    
+                    return (
+                      <div
+                        key={colIndex}
+                        onClick={() => handleSquareClick(rowIndex, colIndex)}
+                        className={isValidMove ? 'valid-move' : ''}
+                        style={{
+                          width: '50px',
+                          height: '55px',
+                          border: '1px solid #8b6f47',
+                          background: isSelected 
+                            ? 'rgba(212, 165, 116, 0.4)' 
+                            : isValidMove 
+                            ? 'rgba(116, 185, 255, 0.3)'
+                            : (rowIndex + colIndex) % 2 === 0 
+                            ? '#c9a66b' 
+                            : '#b89654',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isSelected ? '0 0 15px rgba(212, 165, 116, 0.6)' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.background = (rowIndex + colIndex) % 2 === 0 ? '#d4b67f' : '#c9a66b';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.background = (rowIndex + colIndex) % 2 === 0 ? '#c9a66b' : '#b89654';
+                          }
+                        }}
+                      >
+                        {isValidMove && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: piece ? 'rgba(255, 80, 80, 0.7)' : 'rgba(116, 185, 255, 0.7)',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                          }} />
+                        )}
+                        {piece && (
+                          <div className="piece-enter" style={{
+                            fontSize: piece.promoted ? '1.3rem' : '1.5rem',
+                            fontWeight: 900,
+                            color: piece.player === 1 ? '#1a0f0a' : '#1a0f0a',
+                            transform: piece.player === 2 ? 'rotate(180deg)' : 'none',
+                            textShadow: '0 1px 2px rgba(255, 255, 255, 0.5)',
+                            background: piece.player === 1 
+                              ? 'linear-gradient(135deg, #fff 0%, #f0f0f0 100%)'
+                              : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+                            padding: '0.3rem 0.5rem',
+                            borderRadius: '4px',
+                            border: piece.player === 1 ? '2px solid #333' : '2px solid #555',
+                            WebkitTextFillColor: piece.player === 1 ? '#1a0f0a' : '#f4e4d4'
+                          }}>
+                            {getPieceName(piece)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 持ち駒エリア（先手） */}
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.4)',
+            border: '2px solid #5a4a3a',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            minWidth: '200px',
+            animation: 'slideIn 0.6s ease-out 0.1s both'
+          }}>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 600,
+              marginBottom: '1rem',
+              color: '#d4a574',
+              borderBottom: '2px solid #5a4a3a',
+              paddingBottom: '0.5rem'
+            }}>
+              先手の持ち駒
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {capturedPieces[1].map((piece, idx) => (
+                <div key={idx} style={{
+                  background: 'rgba(212, 165, 116, 0.15)',
+                  border: '1px solid #7a5a3a',
+                  borderRadius: '6px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '1.2rem',
+                  fontWeight: 600
+                }}>
+                  {getPieceName(piece)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ゲーム情報 */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '2rem',
+          animation: 'fadeIn 0.8s ease-out 0.4s both'
+        }}>
+          <div style={{
+            fontSize: '1.5rem',
+            fontWeight: 600,
+            marginBottom: '1rem',
+            color: currentPlayer === 1 ? '#74b9ff' : '#ff6b6b'
+          }}>
+            {currentPlayer === 1 ? '先手' : '後手'}の番です
+          </div>
+          <button
+            onClick={resetGame}
+            style={{
+              background: 'linear-gradient(135deg, #d4a574 0%, #c99554 100%)',
+              border: '2px solid #8b6f47',
+              borderRadius: '12px',
+              padding: '0.75rem 2rem',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              color: '#1a0f0a',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(212, 165, 116, 0.4)',
+              transition: 'all 0.3s ease',
+              fontFamily: '"Noto Serif JP", serif'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(212, 165, 116, 0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(212, 165, 116, 0.4)';
+            }}
+          >
+            新しいゲーム
+          </button>
+        </div>
+
+        {/* 成り確認ダイアログ */}
+        {showPromotionDialog && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.3s ease-out'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #3d2817 0%, #2d1f12 100%)',
+              border: '3px solid #d4a574',
+              borderRadius: '16px',
+              padding: '2rem',
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                fontWeight: 600,
+                marginBottom: '2rem',
+                color: '#d4a574'
+              }}>
+                駒を成りますか？
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button
+                  onClick={() => handlePromotion(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #74b9ff 0%, #5599ff 100%)',
+                    border: '2px solid #3388ff',
+                    borderRadius: '10px',
+                    padding: '0.75rem 2rem',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontFamily: '"Noto Serif JP", serif',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  成る
+                </button>
+                <button
+                  onClick={() => handlePromotion(false)}
+                  style={{
+                    background: 'linear-gradient(135deg, #ff6b6b 0%, #ff5555 100%)',
+                    border: '2px solid #ff3333',
+                    borderRadius: '10px',
+                    padding: '0.75rem 2rem',
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontFamily: '"Noto Serif JP", serif',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  成らない
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ShogiGame;
